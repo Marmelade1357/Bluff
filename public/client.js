@@ -199,10 +199,25 @@
   });
 
   let myHand = [];
+  let handOrder = []; // Karten-IDs in der Reihenfolge, die der Spieler selbst per Drag&Drop festgelegt hat
+
+  function syncHandOrder() {
+    const ids = myHand.map((c) => c.id);
+    const idSet = new Set(ids);
+    handOrder = handOrder.filter((id) => idSet.has(id));
+    ids.forEach((id) => { if (!handOrder.includes(id)) handOrder.push(id); });
+  }
+
+  function orderedHand() {
+    const byId = new Map(myHand.map((c) => [c.id, c]));
+    return handOrder.map((id) => byId.get(id)).filter(Boolean);
+  }
+
   socket.on('yourHand', (data) => {
     myHand = data.hand || [];
     const validIds = new Set(myHand.map((c) => c.id));
     selectedCardIds.forEach((id) => { if (!validIds.has(id)) selectedCardIds.delete(id); });
+    syncHandOrder();
     if (latestState) render(latestState);
   });
 
@@ -556,34 +571,36 @@
 
     const list = $('hand-list');
     list.innerHTML = '';
-    myHand.forEach((card) => {
+    orderedHand().forEach((card) => {
       const cardEl = renderCardFace(card);
+      cardEl.setAttribute('draggable', 'true');
       if (!myTurn) cardEl.classList.add('disabled');
       if (selectedCardIds.has(card.id)) cardEl.classList.add('selected');
-      if (myTurn) {
-        cardEl.addEventListener('click', () => {
-          if (selectedCardIds.has(card.id)) selectedCardIds.delete(card.id);
-          else selectedCardIds.add(card.id);
-          render(state);
-        });
-      }
+      cardEl.addEventListener('click', () => {
+        if (dragMoved) { dragMoved = false; return; } // Klick am Ende eines Drags nicht als Auswahl werten
+        if (!myTurn) return;
+        if (selectedCardIds.has(card.id)) selectedCardIds.delete(card.id);
+        else selectedCardIds.add(card.id);
+        render(state);
+      });
       list.appendChild(cardEl);
     });
   }
 
   // ---------------------------------------------------------------------
-  // Handkarten-Vergrößerung beim Hovern (Dock-Effekt, wie das macOS-Dock)
+  // Handkarten-Vergrößerung beim Hovern (dezenter Dock-Effekt)
   // ---------------------------------------------------------------------
 
   function attachHandMagnify(listEl) {
     if (!listEl) return;
-    const MAX_SCALE = 1.5;
-    const SIGMA = 70; // px – wie schnell der Effekt mit dem Abstand abnimmt
-    const MAX_LIFT = 46; // px
+    const MAX_SCALE = 1.14;
+    const SIGMA = 55; // px – wie schnell der Effekt mit dem Abstand abnimmt
+    const MAX_LIFT = 12; // px
 
     function apply(mouseX) {
       const cards = Array.from(listEl.children);
       cards.forEach((c) => {
+        if (c.classList.contains('dragging')) return;
         const rect = c.getBoundingClientRect();
         const cx = rect.left + rect.width / 2;
         const dist = mouseX - cx;
@@ -598,6 +615,7 @@
 
     function reset() {
       Array.from(listEl.children).forEach((c) => {
+        if (c.classList.contains('dragging')) return;
         c.style.transform = '';
         c.style.zIndex = '';
       });
@@ -607,7 +625,64 @@
     listEl.addEventListener('mouseleave', reset);
   }
 
+  // ---------------------------------------------------------------------
+  // Handkarten selbst sortieren (per Drag & Drop)
+  // ---------------------------------------------------------------------
+
+  let dragMoved = false;
+
+  function getDragAfterElement(container, x) {
+    const els = Array.from(container.querySelectorAll('.pcard:not(.dragging)'));
+    let closest = { offset: Number.NEGATIVE_INFINITY, element: null };
+    els.forEach((child) => {
+      const box = child.getBoundingClientRect();
+      const offset = x - (box.left + box.width / 2);
+      if (offset < 0 && offset > closest.offset) closest = { offset, element: child };
+    });
+    return closest.element;
+  }
+
+  function attachHandDragSort(listEl) {
+    if (!listEl) return;
+
+    listEl.addEventListener('dragstart', (e) => {
+      const card = e.target.closest('.pcard');
+      if (!card) return;
+      dragMoved = false;
+      card.classList.add('dragging');
+      card.style.transform = '';
+      card.style.zIndex = '';
+      if (e.dataTransfer) {
+        e.dataTransfer.effectAllowed = 'move';
+        try { e.dataTransfer.setData('text/plain', card.dataset.cardId || ''); } catch (err) { /* Safari braucht keine Daten */ }
+      }
+    });
+
+    listEl.addEventListener('dragover', (e) => {
+      const dragging = listEl.querySelector('.pcard.dragging');
+      if (!dragging) return;
+      e.preventDefault();
+      if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
+      dragMoved = true;
+      const after = getDragAfterElement(listEl, e.clientX);
+      if (after == null) listEl.appendChild(dragging);
+      else if (after !== dragging.nextSibling) listEl.insertBefore(dragging, after);
+    });
+
+    listEl.addEventListener('drop', (e) => {
+      e.preventDefault();
+      handOrder = Array.from(listEl.querySelectorAll('.pcard')).map((c) => c.dataset.cardId);
+    });
+
+    listEl.addEventListener('dragend', (e) => {
+      const card = e.target.closest('.pcard');
+      if (card) card.classList.remove('dragging');
+      setTimeout(() => { dragMoved = false; }, 0);
+    });
+  }
+
   attachHandMagnify($('hand-list'));
+  attachHandDragSort($('hand-list'));
 
   function renderRoundEnd(state) {
     const panel = $('roundend-panel');

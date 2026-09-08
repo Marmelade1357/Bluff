@@ -13,7 +13,7 @@
   --danger: #e35d6a;
   --success: #3ecf8e;
   --radius: 14px;
-  --hand-bar-height: 322px;
+  --hand-bar-height: 288px;
 }
 
 * { box-sizing: border-box; }
@@ -276,25 +276,25 @@ input:focus, select:focus { outline: 2px solid var(--gold); }
 }
 .pile-stack {
   position: relative;
-  width: 74px;
-  height: 106px;
+  width: 128px;
+  height: 183px;
 }
 .pile-stack .pcard-back {
   position: absolute;
   top: 0; left: 0;
-  width: 74px;
-  height: 106px;
+  width: 128px;
+  height: 183px;
 }
 .pile-count {
   position: absolute;
-  top: 50%; left: 50%;
-  transform: translate(-50%, -50%);
-  background: rgba(0,0,0,0.55);
+  top: 0; left: 50%;
+  transform: translate(-50%, calc(-100% - 10px));
+  background: rgba(0,0,0,0.6);
   color: white;
   font-weight: 800;
-  font-size: 1rem;
-  width: 34px;
-  height: 34px;
+  font-size: 1.05rem;
+  width: 38px;
+  height: 38px;
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -449,10 +449,10 @@ input:focus, select:focus { outline: 2px solid var(--gold); }
   list-style: none;
   margin: 0;
   flex: 1;
-  padding: 72px 22px 4px;
+  padding: 30px 22px 4px;
   display: flex;
   align-items: flex-end;
-  gap: 4px;
+  gap: 14px;
   overflow-x: auto;
   overflow-y: hidden;
   justify-content: safe center;
@@ -463,14 +463,19 @@ input:focus, select:focus { outline: 2px solid var(--gold); }
 .hand-list .pcard {
   width: 132px;
   height: 189px;
-  cursor: pointer;
+  cursor: grab;
   transform-origin: bottom center;
   transition: transform 0.12s ease-out, box-shadow 0.12s ease;
-  margin-left: -46px;
 }
-.hand-list .pcard:first-child { margin-left: 0; }
 .hand-list .pcard.selected { box-shadow: 0 0 0 3px var(--gold), 0 6px 16px rgba(0,0,0,0.5); }
-.hand-list .pcard.disabled { opacity: 0.5; cursor: not-allowed; }
+.hand-list .pcard.disabled { cursor: not-allowed; }
+.hand-list .pcard.dragging {
+  cursor: grabbing;
+  opacity: 1;
+  outline: 3px dashed var(--gold);
+  transform: scale(0.94) !important;
+  z-index: 50 !important;
+}
 
 /* ---------------- Würfel-Overlay ---------------- */
 
@@ -537,15 +542,16 @@ input:focus, select:focus { outline: 2px solid var(--gold); }
 .history-round ol { margin: 0; padding-left: 20px; }
 
 @media (max-width: 640px) {
-  :root { --hand-bar-height: 230px; }
+  :root { --hand-bar-height: 208px; }
   .table-oval { width: 94vw; height: 76vw; max-height: 46vh; border-width: 6px; }
   .seat { width: 88px; }
   .seat-avatar { width: 42px; height: 42px; font-size: 1.05rem; }
   .seat-name { font-size: 0.72rem; max-width: 88px; }
   .pcard { width: 56px; height: 80px; }
-  .pile-stack, .pile-stack .pcard-back { width: 50px; height: 72px; }
-  .hand-list { padding: 46px 14px 4px; gap: 2px; }
-  .hand-list .pcard { width: 84px; height: 120px; margin-left: -30px; }
+  .pile-stack, .pile-stack .pcard-back { width: 92px; height: 132px; }
+  .pile-count { width: 30px; height: 30px; font-size: 0.85rem; }
+  .hand-list { padding: 20px 14px 4px; gap: 8px; }
+  .hand-list .pcard { width: 84px; height: 120px; }
 
   .player-panel {
     position: static;
