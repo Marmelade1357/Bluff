@@ -161,7 +161,15 @@ input:focus, select:focus { outline: 2px solid var(--gold); }
   height: 26px;
   cursor: pointer;
 }
-.remove-bot-btn.confirm { background: var(--danger); color: white; border-color: var(--danger); }
+.remove-bot-btn.confirm {
+  background: var(--danger);
+  color: white;
+  border-color: var(--danger);
+  width: auto;
+  padding: 0 10px;
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
 
 .bot-controls { display: flex; gap: 8px; margin-bottom: 6px; flex-wrap: wrap; }
 
@@ -452,7 +460,6 @@ input:focus, select:focus { outline: 2px solid var(--gold); }
   padding: 30px 22px 4px;
   display: flex;
   align-items: flex-end;
-  gap: 14px;
   overflow-x: auto;
   overflow-y: hidden;
   justify-content: safe center;
@@ -474,7 +481,7 @@ input:focus, select:focus { outline: 2px solid var(--gold); }
   opacity: 1;
   outline: 3px dashed var(--gold);
   transform: scale(0.94) !important;
-  z-index: 50 !important;
+  z-index: 500 !important;
 }
 
 /* ---------------- Würfel-Overlay ---------------- */
@@ -550,7 +557,7 @@ input:focus, select:focus { outline: 2px solid var(--gold); }
   .pcard { width: 56px; height: 80px; }
   .pile-stack, .pile-stack .pcard-back { width: 92px; height: 132px; }
   .pile-count { width: 30px; height: 30px; font-size: 0.85rem; }
-  .hand-list { padding: 20px 14px 4px; gap: 8px; }
+  .hand-list { padding: 20px 14px 4px; }
   .hand-list .pcard { width: 84px; height: 120px; }
 
   .player-panel {

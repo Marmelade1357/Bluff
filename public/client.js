@@ -585,7 +585,52 @@
       });
       list.appendChild(cardEl);
     });
+    layoutHandFan(list);
   }
+
+  // ---------------------------------------------------------------------
+  // Handkarten so überlappen lassen, dass alle auf den Bildschirm passen
+  // (aber immer mindestens die Eckzahl der darunterliegenden Karte sichtbar)
+  // ---------------------------------------------------------------------
+
+  const HAND_GAP = 14;
+  const HAND_MIN_VISIBLE = 42; // px – genug, um Ecke mit Zahl/Symbol noch zu sehen
+
+  function layoutHandFan(listEl) {
+    const cards = Array.from(listEl.children);
+    if (!cards.length) return;
+    const cardWidth = cards[0].getBoundingClientRect().width || 132;
+    const paddingLeft = parseFloat(getComputedStyle(listEl).paddingLeft) || 0;
+    const paddingRight = parseFloat(getComputedStyle(listEl).paddingRight) || 0;
+    const containerWidth = listEl.clientWidth - paddingLeft - paddingRight;
+
+    if (cards.length <= 1) {
+      cards.forEach((c) => { c.style.marginLeft = '0'; });
+      return;
+    }
+
+    const neededFullWidth = cards.length * cardWidth + (cards.length - 1) * HAND_GAP;
+    if (neededFullWidth <= containerWidth) {
+      cards.forEach((c, i) => { c.style.marginLeft = i === 0 ? '0' : HAND_GAP + 'px'; });
+      return;
+    }
+
+    let visibleSlice = (containerWidth - cardWidth) / (cards.length - 1);
+    if (!isFinite(visibleSlice) || visibleSlice < HAND_MIN_VISIBLE) visibleSlice = HAND_MIN_VISIBLE;
+    const overlap = cardWidth - visibleSlice;
+    cards.forEach((c, i) => {
+      c.style.marginLeft = i === 0 ? '0' : `-${overlap.toFixed(1)}px`;
+    });
+  }
+
+  let handResizeTimer = null;
+  window.addEventListener('resize', () => {
+    clearTimeout(handResizeTimer);
+    handResizeTimer = setTimeout(() => {
+      const list = $('hand-list');
+      if (list && list.children.length) layoutHandFan(list);
+    }, 120);
+  });
 
   // ---------------------------------------------------------------------
   // Handkarten-Vergrößerung beim Hovern (dezenter Dock-Effekt)
@@ -597,8 +642,16 @@
     const SIGMA = 55; // px – wie schnell der Effekt mit dem Abstand abnimmt
     const MAX_LIFT = 12; // px
 
-    function apply(mouseX) {
+    function apply(mouseX, mouseY) {
       const cards = Array.from(listEl.children);
+      // Bei überlappenden Karten liegt die sichtbare Ecke einer Karte oft näher
+      // an der Mitte der VORHERIGEN Karte als an der eigenen (breiten) Boundingbox-
+      // Mitte. Deshalb per echtem Hit-Test bestimmen, welche Karte gerade wirklich
+      // unter dem Mauszeiger liegt, und die bekommt garantiert den höchsten z-index –
+      // sonst könnte eine falsch "nähere" Nachbarkarte darüberliegen.
+      const hitEl = document.elementFromPoint(mouseX, mouseY);
+      const hitCard = hitEl ? hitEl.closest('.pcard') : null;
+
       cards.forEach((c) => {
         if (c.classList.contains('dragging')) return;
         const rect = c.getBoundingClientRect();
@@ -609,7 +662,9 @@
         const lift = MAX_LIFT * falloff;
         const extraSelected = c.classList.contains('selected') ? 14 : 0;
         c.style.transform = `translateY(-${(lift + extraSelected).toFixed(1)}px) scale(${scale.toFixed(3)})`;
-        c.style.zIndex = String(100 + Math.round(falloff * 100));
+        let z = 100 + Math.round(falloff * 100);
+        if (c === hitCard) z += 1000;
+        c.style.zIndex = String(z);
       });
     }
 
@@ -621,7 +676,7 @@
       });
     }
 
-    listEl.addEventListener('mousemove', (e) => apply(e.clientX));
+    listEl.addEventListener('mousemove', (e) => apply(e.clientX, e.clientY));
     listEl.addEventListener('mouseleave', reset);
   }
 
@@ -649,9 +704,14 @@
       const card = e.target.closest('.pcard');
       if (!card) return;
       dragMoved = false;
+      // Während des Drags feuert kein mousemove mehr (native Drag&Drop) – daher
+      // hier den Hover-Vergrößerungseffekt auf allen Karten zurücksetzen, sonst
+      // könnte eine zuvor vergrößerte Nachbarkarte über der gezogenen Karte liegen.
+      Array.from(listEl.children).forEach((c) => {
+        c.style.transform = '';
+        c.style.zIndex = '';
+      });
       card.classList.add('dragging');
-      card.style.transform = '';
-      card.style.zIndex = '';
       if (e.dataTransfer) {
         e.dataTransfer.effectAllowed = 'move';
         try { e.dataTransfer.setData('text/plain', card.dataset.cardId || ''); } catch (err) { /* Safari braucht keine Daten */ }
