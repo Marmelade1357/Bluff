@@ -13,6 +13,7 @@
   --danger: #e35d6a;
   --success: #3ecf8e;
   --radius: 14px;
+  --hand-bar-height: 322px;
 }
 
 * { box-sizing: border-box; }
@@ -191,19 +192,76 @@ input:focus, select:focus { outline: 2px solid var(--gold); }
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 20px 16px 260px;
+  padding: 20px 16px calc(var(--hand-bar-height) + 24px);
   min-height: calc(100vh - 64px);
 }
 
 .table-oval {
   position: relative;
-  width: min(92vw, 900px);
-  height: min(72vw, 560px);
-  max-height: 62vh;
+  width: min(97vw, 1240px);
+  height: min(82vw, 780px);
+  max-height: 74vh;
   border-radius: 50%;
   background: radial-gradient(ellipse at center, var(--felt) 0%, var(--felt-dark) 72%, #0a2417 100%);
   border: 10px solid #4a3018;
   box-shadow: inset 0 4px 30px rgba(0,0,0,0.5), 0 14px 50px rgba(0,0,0,0.45);
+}
+
+/* ---------------- Spieler-Panel (Übersicht mit Kartenanzahl) ---------------- */
+
+.player-panel {
+  position: fixed;
+  top: 76px;
+  left: 16px;
+  width: 210px;
+  max-width: 34vw;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px;
+  z-index: 20;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+  max-height: calc(100vh - 110px - var(--hand-bar-height));
+  overflow-y: auto;
+}
+.player-panel h3 {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-dim);
+  margin: 0 0 8px;
+}
+.player-panel-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.player-panel-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 7px 9px;
+  border-radius: 8px;
+  background: var(--bg-alt);
+  border: 1px solid transparent;
+  font-size: 0.85rem;
+}
+.player-panel-row.me { border-color: var(--gold); }
+.player-panel-row.active { border-color: var(--success); box-shadow: 0 0 10px rgba(62,207,142,0.4); }
+.player-panel-row.disconnected { opacity: 0.45; }
+.player-panel-row.finished { opacity: 0.75; }
+.player-panel-name {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.player-panel-count {
+  color: var(--gold-bright);
+  font-weight: 700;
+  font-size: 0.8rem;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .pile-center {
@@ -218,14 +276,14 @@ input:focus, select:focus { outline: 2px solid var(--gold); }
 }
 .pile-stack {
   position: relative;
-  width: 64px;
-  height: 92px;
+  width: 74px;
+  height: 106px;
 }
 .pile-stack .pcard-back {
   position: absolute;
   top: 0; left: 0;
-  width: 64px;
-  height: 92px;
+  width: 74px;
+  height: 106px;
 }
 .pile-count {
   position: absolute;
@@ -315,9 +373,9 @@ input:focus, select:focus { outline: 2px solid var(--gold); }
 /* ---------------- Spielkarten (echte Kartenmotive als Bild) ---------------- */
 
 .pcard {
-  width: 74px;
-  height: 106px;
-  border-radius: 8px;
+  width: 84px;
+  height: 120px;
+  border-radius: 9px;
   overflow: hidden;
   background: #fdfdfb;
   border: 1px solid #c9c9c0;
@@ -327,9 +385,9 @@ input:focus, select:focus { outline: 2px solid var(--gold); }
 }
 
 .pcard-back {
-  width: 74px;
-  height: 106px;
-  border-radius: 8px;
+  width: 84px;
+  height: 120px;
+  border-radius: 9px;
   overflow: hidden;
   background: #0a2417;
   border: 2px solid var(--gold);
@@ -343,7 +401,7 @@ input:focus, select:focus { outline: 2px solid var(--gold); }
 .action-bar {
   position: fixed;
   left: 0; right: 0;
-  bottom: 168px;
+  bottom: var(--hand-bar-height);
   display: flex;
   justify-content: center;
   z-index: 40;
@@ -378,19 +436,41 @@ input:focus, select:focus { outline: 2px solid var(--gold); }
 .hand-bar {
   position: fixed;
   left: 0; right: 0; bottom: 0;
+  height: var(--hand-bar-height);
   background: var(--bg-alt);
   border-top: 1px solid var(--border);
-  padding: 10px 14px 14px;
+  padding: 14px 14px 20px;
   z-index: 30;
+  display: flex;
+  flex-direction: column;
 }
-.hand-bar-label { font-size: 0.72rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px; text-align: center; }
-.hand-list { list-style: none; margin: 0; padding: 0 14px; display: flex; gap: 8px; overflow-x: auto; overflow-y: hidden; justify-content: safe center; scrollbar-width: none; -ms-overflow-style: none; }
+.hand-bar-label { font-size: 0.78rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px; text-align: center; flex-shrink: 0; }
+.hand-list {
+  list-style: none;
+  margin: 0;
+  flex: 1;
+  padding: 72px 22px 4px;
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  justify-content: safe center;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
 .hand-list::-webkit-scrollbar { display: none; height: 0; }
-.hand-list .pcard { cursor: pointer; transition: transform 0.12s ease, box-shadow 0.12s ease; }
-.hand-list .pcard:hover { transform: translateY(-6px); }
-.hand-list .pcard.selected { transform: translateY(-14px); box-shadow: 0 0 0 3px var(--gold), 0 6px 16px rgba(0,0,0,0.5); }
+.hand-list .pcard {
+  width: 132px;
+  height: 189px;
+  cursor: pointer;
+  transform-origin: bottom center;
+  transition: transform 0.12s ease-out, box-shadow 0.12s ease;
+  margin-left: -46px;
+}
+.hand-list .pcard:first-child { margin-left: 0; }
+.hand-list .pcard.selected { box-shadow: 0 0 0 3px var(--gold), 0 6px 16px rgba(0,0,0,0.5); }
 .hand-list .pcard.disabled { opacity: 0.5; cursor: not-allowed; }
-.hand-list .pcard.disabled:hover { transform: none; }
 
 /* ---------------- Würfel-Overlay ---------------- */
 
@@ -457,12 +537,24 @@ input:focus, select:focus { outline: 2px solid var(--gold); }
 .history-round ol { margin: 0; padding-left: 20px; }
 
 @media (max-width: 640px) {
-  .table-oval { width: 94vw; height: 76vw; max-height: 52vh; border-width: 6px; }
+  :root { --hand-bar-height: 230px; }
+  .table-oval { width: 94vw; height: 76vw; max-height: 46vh; border-width: 6px; }
   .seat { width: 88px; }
   .seat-avatar { width: 42px; height: 42px; font-size: 1.05rem; }
   .seat-name { font-size: 0.72rem; max-width: 88px; }
   .pcard { width: 56px; height: 80px; }
   .pile-stack, .pile-stack .pcard-back { width: 50px; height: 72px; }
-  .hand-list .pcard { width: 62px; height: 89px; }
-  .action-bar { bottom: 150px; }
+  .hand-list { padding: 46px 14px 4px; gap: 2px; }
+  .hand-list .pcard { width: 84px; height: 120px; margin-left: -30px; }
+
+  .player-panel {
+    position: static;
+    width: auto;
+    max-width: none;
+    max-height: none;
+    margin: 10px 12px 0;
+    overflow-y: visible;
+  }
+  .player-panel-list { flex-direction: row; overflow-x: auto; padding-bottom: 2px; }
+  .player-panel-row { flex-shrink: 0; }
 }

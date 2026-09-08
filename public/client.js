@@ -333,12 +333,46 @@
     $('round-badge').textContent = state.roundNumber ? `Runde ${state.roundNumber}` : '';
 
     renderSeats(state);
+    renderPlayerPanel(state);
     renderPile(state);
     renderDice(state);
     renderReveal(state);
     renderActionBar(state);
     renderHandBar(state);
     renderRoundEnd(state);
+  }
+
+  function renderPlayerPanel(state) {
+    const list = $('player-panel-list');
+    list.innerHTML = '';
+    const order = layoutOrder(state);
+    order.forEach((p) => {
+      const classes = ['player-panel-row'];
+      if (p.id === myId()) classes.push('me');
+      if (state.currentTurnId === p.id && (state.phase === 'playing' || state.phase === 'reveal')) classes.push('active');
+      if (!p.connected && !p.isBot) classes.push('disconnected');
+      if (p.finished) classes.push('finished');
+
+      const tags = [];
+      if (p.isHost) tags.push(el('span', { class: 'tag host', text: 'Host' }));
+      if (p.isBot) tags.push(el('span', { class: 'tag', text: '🤖' }));
+
+      const nameEl = el('span', { class: 'player-panel-name' }, [
+        el('span', { text: p.name }),
+        ...tags,
+      ]);
+
+      let countLabel;
+      if (state.phase !== 'lobby' && p.finished) {
+        const isRoundLoser = state.phase === 'roundend' && p.id === state.finishedOrder[state.finishedOrder.length - 1] && p.handCount > 0;
+        countLabel = isRoundLoser ? '😬' : `🏅 ${p.place}`;
+      } else {
+        countLabel = `🂠 ${p.handCount}`;
+      }
+      const countEl = el('span', { class: 'player-panel-count', text: countLabel });
+
+      list.appendChild(el('li', { class: classes.join(' ') }, [nameEl, countEl]));
+    });
   }
 
   function layoutOrder(state) {
@@ -536,6 +570,44 @@
       list.appendChild(cardEl);
     });
   }
+
+  // ---------------------------------------------------------------------
+  // Handkarten-Vergrößerung beim Hovern (Dock-Effekt, wie das macOS-Dock)
+  // ---------------------------------------------------------------------
+
+  function attachHandMagnify(listEl) {
+    if (!listEl) return;
+    const MAX_SCALE = 1.5;
+    const SIGMA = 70; // px – wie schnell der Effekt mit dem Abstand abnimmt
+    const MAX_LIFT = 46; // px
+
+    function apply(mouseX) {
+      const cards = Array.from(listEl.children);
+      cards.forEach((c) => {
+        const rect = c.getBoundingClientRect();
+        const cx = rect.left + rect.width / 2;
+        const dist = mouseX - cx;
+        const falloff = Math.exp(-(dist * dist) / (2 * SIGMA * SIGMA));
+        const scale = 1 + (MAX_SCALE - 1) * falloff;
+        const lift = MAX_LIFT * falloff;
+        const extraSelected = c.classList.contains('selected') ? 14 : 0;
+        c.style.transform = `translateY(-${(lift + extraSelected).toFixed(1)}px) scale(${scale.toFixed(3)})`;
+        c.style.zIndex = String(100 + Math.round(falloff * 100));
+      });
+    }
+
+    function reset() {
+      Array.from(listEl.children).forEach((c) => {
+        c.style.transform = '';
+        c.style.zIndex = '';
+      });
+    }
+
+    listEl.addEventListener('mousemove', (e) => apply(e.clientX));
+    listEl.addEventListener('mouseleave', reset);
+  }
+
+  attachHandMagnify($('hand-list'));
 
   function renderRoundEnd(state) {
     const panel = $('roundend-panel');
