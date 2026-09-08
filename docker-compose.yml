@@ -1,0 +1,17 @@
+name: bluff
+
+services:
+  app:
+    build: .
+    environment:
+      - TZ=Europe/Berlin
+    ports:
+      # Nur intern auf dem Pi erreichbar (127.0.0.1:8095) - ein bereits
+      # laufender Reverse Proxy auf dem Pi kann eine Subdomain (z.B.
+      # bluff.oualid.de) hierher routen, analog zu wd.oualid.de -> 8092
+      # (Der Widerstand) und wizard.oualid.de -> 8093 (Wizard). Port 8095
+      # gewählt, weil 8080/8081/8090/8091/8092/8093/8094/8443 schon von den
+      # anderen Projekten (FinanceAgent, Monitoring Shop, Widerstand, Wizard,
+      # Spielehub) belegt sind.
+      - "127.0.0.1:8095:3000"
+    restart: unless-stopped

@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Bluff (Lügen) – Online</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%83%8F%3C/text%3E%3C/svg%3E" />
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<div id="toast" class="toast hidden"></div>
+
+<!-- ============ START ============ -->
+<section id="screen-home" class="screen">
+  <div class="card home-card">
+    <h1>🃏 Bluff <span class="subtle-title">(Lügen)</span></h1>
+    <p class="subtitle">Online mit Freunden spielen – sag die Wahrheit oder lüg wie gedruckt.</p>
+
+    <div class="tabs">
+      <button class="tab-btn active" data-tab="create">Raum erstellen</button>
+      <button class="tab-btn" data-tab="join">Raum beitreten</button>
+    </div>
+
+    <div id="tab-create" class="tab-panel">
+      <label>Dein Name</label>
+      <input id="create-name" maxlength="20" placeholder="z. B. Oualid" />
+      <button id="btn-create" class="btn primary">Neuen Raum erstellen</button>
+    </div>
+
+    <div id="tab-join" class="tab-panel hidden">
+      <label>Dein Name</label>
+      <input id="join-name" maxlength="20" placeholder="z. B. Alex" />
+      <label>Raum-Code</label>
+      <input id="join-code" maxlength="4" placeholder="z. B. AB12" style="text-transform:uppercase" />
+      <button id="btn-join" class="btn primary">Beitreten</button>
+    </div>
+
+    <p class="hint">2–8 Spieler · Ein Gerät pro Person (Handy, Tablet oder PC)</p>
+  </div>
+
+  <a id="btn-back-hub-home" class="btn ghost small hidden back-hub-home" href="/">← Spielauswahl</a>
+</section>
+
+<!-- ============ LOBBY ============ -->
+<section id="screen-lobby" class="screen hidden">
+  <div class="card">
+    <div class="lobby-header">
+      <div>
+        <div class="eyebrow">Raum-Code – an Freunde weitergeben</div>
+        <div id="lobby-code" class="room-code">----</div>
+      </div>
+      <button id="btn-leave-lobby" class="btn ghost small">Verlassen</button>
+    </div>
+
+    <h3>Am Tisch (<span id="lobby-count">0</span>/8)</h3>
+    <ul id="lobby-players" class="player-list"></ul>
+
+    <div id="lobby-bot-controls" class="bot-controls hidden">
+      <button id="btn-fill-bots" class="btn secondary small hidden">🤖 Mit Bots auf 2 auffüllen</button>
+      <button id="btn-add-bot" class="btn ghost small">+ Bot hinzufügen</button>
+    </div>
+    <p class="hint">Allein testen? Füge Bots hinzu – sie legen Karten, bluffen gelegentlich und rufen auch mal "Bluff!".</p>
+
+    <div id="deck-settings" class="deck-settings hidden">
+      <h3>🂠 Deck-Einstellungen</h3>
+      <div class="deck-settings-row">
+        <label>Kartenwerte</label>
+        <select id="setting-deck-range">
+          <option value="52">52 Karten (2 bis As)</option>
+          <option value="32">32 Karten (7 bis As)</option>
+        </select>
+      </div>
+      <div class="deck-settings-row">
+        <label>Kombinierte Decks</label>
+        <select id="setting-deck-count">
+          <option value="1">1 Deck</option>
+          <option value="2">2 Decks (für große Runden)</option>
+        </select>
+      </div>
+      <div class="deck-settings-row">
+        <label>Anzahl Buben (Joker)</label>
+        <div class="stepper">
+          <button id="setting-jack-minus" class="btn ghost small" type="button">−</button>
+          <span id="setting-jack-value">4</span>
+          <button id="setting-jack-plus" class="btn ghost small" type="button">+</button>
+        </div>
+      </div>
+      <p class="hint">Buben zählen als Joker – jede Sorte, außer sich selbst (Regel 2.9). Weniger Buben = weniger Rettungsanker beim Bluffen.</p>
+    </div>
+    <div id="deck-settings-readonly" class="hint deck-settings-readonly hidden"></div>
+
+    <p id="lobby-status" class="hint"></p>
+    <button id="btn-start" class="btn primary hidden">Spiel starten</button>
+    <button id="btn-show-rules-lobby" class="btn ghost small rules-btn">📜 Regeln ansehen</button>
+  </div>
+</section>
+
+<!-- ============ SPIEL ============ -->
+<section id="screen-game" class="screen hidden">
+  <header class="game-header">
+    <div class="game-header-top">
+      <div class="game-header-left">
+        <span class="room-code small" id="game-code"></span>
+        <span id="round-badge" class="round-badge"></span>
+      </div>
+      <div class="game-header-right">
+        <button id="btn-show-rules" class="btn ghost small">📜 Regeln</button>
+        <button id="btn-show-history" class="btn ghost small">🏁 Verlauf</button>
+        <button id="btn-leave-game" class="btn ghost small">Verlassen</button>
+      </div>
+    </div>
+  </header>
+
+  <div id="dice-overlay" class="modal hidden">
+    <div class="modal-content dice-modal-content">
+      <div class="dice-emoji">🎲</div>
+      <h2 id="dice-title">Wer fängt an?</h2>
+      <ul id="dice-list" class="dice-list"></ul>
+    </div>
+  </div>
+
+  <main class="table-wrap">
+    <div id="table-oval" class="table-oval">
+      <div id="pile-center" class="pile-center">
+        <div id="pile-stack" class="pile-stack"></div>
+        <div id="pile-count" class="pile-count hidden">0</div>
+        <div id="pile-claim" class="pile-claim"></div>
+      </div>
+      <div id="seats-layer" class="seats-layer"></div>
+    </div>
+  </main>
+
+  <div id="reveal-overlay" class="modal hidden">
+    <div class="modal-content reveal-modal-content">
+      <div id="reveal-cards" class="reveal-cards"></div>
+      <p id="reveal-text" class="reveal-text"></p>
+    </div>
+  </div>
+
+  <div id="roundend-panel" class="roundend-panel hidden">
+    <div class="card roundend-card">
+      <h2>🏁 Runde <span id="roundend-number"></span> beendet</h2>
+      <ol id="roundend-order" class="roundend-order"></ol>
+      <div id="roundend-actions" class="roundend-actions"></div>
+    </div>
+  </div>
+
+  <div id="action-bar" class="action-bar hidden">
+    <div id="action-bar-content"></div>
+  </div>
+
+  <div id="hand-bar" class="hand-bar hidden">
+    <div class="hand-bar-label" id="hand-bar-label">Deine Karten</div>
+    <ul id="hand-list" class="hand-list"></ul>
+  </div>
+</section>
+
+<!-- ============ REGELN MODAL ============ -->
+<div id="rules-modal" class="modal hidden">
+  <div class="modal-content rules-modal-content">
+    <button id="btn-close-rules-modal" class="btn ghost small modal-close">✕</button>
+    <h2>📜 Regeln – Bluff (Lügen)</h2>
+    <div class="rules-text">
+      <h3>Spielbeginn</h3>
+      <p>Die Karten werden gleichmäßig an alle Spieler verteilt. In der ersten Runde entscheidet ein Würfelwurf, wer anfängt – danach eröffnet immer, wer die vorige Runde als letzte:r noch Karten auf der Hand hatte ("Verlierer"). Buben sind Joker: Sie zählen als jede Kartensorte, dürfen aber nie selbst als Sorte angesagt werden.</p>
+      <h3>Spielweise</h3>
+      <p>Karten werden verdeckt gespielt. Wer eröffnet, sagt an, welche Sorte auf den Stapel muss (z. B. "Könige"). Jeder weitere Zug muss angeblich dieselbe Sorte sein – ob ehrlich gespielt oder gelogen, entscheidet ihr selbst. Mindestens 1 Karte pro Zug, mehr sind erlaubt.</p>
+      <p>Nach jedem Zug muss der nächste Spieler entweder selbst weiterlegen oder "Bluff!" rufen und dem Vorgänger die Lüge unterstellen. Lag er richtig, nimmt der Lügner den ganzen Stapel auf die Hand – und der Ankläger eröffnet neu. Lag er falsch, nimmt der Ankläger selbst den Stapel auf – und wer danach an der Reihe ist, eröffnet neu.</p>
+      <p>Hat ein Spieler 4 Karten derselben Sorte auf der Hand, werden diese automatisch abgelegt.</p>
+      <h3>Gewinnen</h3>
+      <p>Wer keine Karten mehr hat, hat diese Runde gewonnen und schaut zu – die anderen spielen normal weiter, bis nur noch eine Person Karten übrig hat (die/der Verlierer:in).</p>
+    </div>
+  </div>
+</div>
+
+<!-- ============ VERLAUF MODAL ============ -->
+<div id="history-modal" class="modal hidden">
+  <div class="modal-content">
+    <button id="btn-close-history-modal" class="btn ghost small modal-close">✕</button>
+    <h2>🏁 Runden-Verlauf</h2>
+    <div id="history-content"></div>
+  </div>
+</div>
+
+<script src="socket.io/socket.io.js"></script>
+<script src="client.js"></script>
+</body>
+</html>
