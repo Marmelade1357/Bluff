@@ -16,10 +16,10 @@
   const SESSION_KEY = 'bluff_session';
   const RANK_LABELS = { J: 'Bube', Q: 'Dame', K: 'König', A: 'As' };
   const SUIT_INFO = {
-    pik: { symbol: '♠', cls: 'suit-black' },
-    kreuz: { symbol: '♣', cls: 'suit-black' },
-    herz: { symbol: '♥', cls: 'suit-red' },
-    karo: { symbol: '♦', cls: 'suit-red' },
+    pik: { symbol: '♠' },
+    kreuz: { symbol: '♣' },
+    herz: { symbol: '♥' },
+    karo: { symbol: '♦' },
   };
 
   let session = null; // { code, playerId, token, name }

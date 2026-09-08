@@ -462,7 +462,6 @@ input:focus, select:focus { outline: 2px solid var(--gold); }
   .seat-avatar { width: 42px; height: 42px; font-size: 1.05rem; }
   .seat-name { font-size: 0.72rem; max-width: 88px; }
   .pcard { width: 56px; height: 80px; }
-  .pcard .pcard-symbol { font-size: 1.4rem; }
   .pile-stack, .pile-stack .pcard-back { width: 50px; height: 72px; }
   .hand-list .pcard { width: 62px; height: 89px; }
   .action-bar { bottom: 150px; }
