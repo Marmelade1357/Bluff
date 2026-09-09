@@ -14,7 +14,7 @@
   }
 
   const SESSION_KEY = 'bluff_session';
-  const RANK_LABELS = { J: 'Bube', Q: 'Dame', K: 'König', A: 'As' };
+  const RANK_LABELS = { J: 'Bube', Q: 'Dame', K: 'König', A: 'Ass' };
   const SUIT_INFO = {
     pik: { symbol: '♠' },
     kreuz: { symbol: '♣' },
@@ -201,6 +201,20 @@
   let myHand = [];
   let handOrder = []; // Karten-IDs in der Reihenfolge, die der Spieler selbst per Drag&Drop festgelegt hat
 
+  const AUTO_SORT_KEY = 'bluff_autosort';
+  let autoSortEnabled = localStorage.getItem(AUTO_SORT_KEY) === '1';
+  const RANK_ORDER = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
+  const SUIT_ORDER = ['pik', 'herz', 'karo', 'kreuz'];
+
+  function sortHandOrderByRank() {
+    const sorted = myHand.slice().sort((a, b) => {
+      const ra = RANK_ORDER.indexOf(a.rank), rb = RANK_ORDER.indexOf(b.rank);
+      if (ra !== rb) return ra - rb;
+      return SUIT_ORDER.indexOf(a.suit) - SUIT_ORDER.indexOf(b.suit);
+    });
+    handOrder = sorted.map((c) => c.id);
+  }
+
   function syncHandOrder() {
     const ids = myHand.map((c) => c.id);
     const idSet = new Set(ids);
@@ -213,11 +227,20 @@
     return handOrder.map((id) => byId.get(id)).filter(Boolean);
   }
 
+  const autoSortCheckbox = $('auto-sort-toggle');
+  autoSortCheckbox.checked = autoSortEnabled;
+  autoSortCheckbox.addEventListener('change', () => {
+    autoSortEnabled = autoSortCheckbox.checked;
+    localStorage.setItem(AUTO_SORT_KEY, autoSortEnabled ? '1' : '0');
+    if (autoSortEnabled) sortHandOrderByRank();
+    if (latestState) render(latestState);
+  });
+
   socket.on('yourHand', (data) => {
     myHand = data.hand || [];
     const validIds = new Set(myHand.map((c) => c.id));
     selectedCardIds.forEach((id) => { if (!validIds.has(id)) selectedCardIds.delete(id); });
-    syncHandOrder();
+    if (autoSortEnabled) sortHandOrderByRank(); else syncHandOrder();
     if (latestState) render(latestState);
   });
 
@@ -504,10 +527,17 @@
       const r = state.lastReveal;
       const cardsEl = $('reveal-cards');
       cardsEl.innerHTML = '';
-      (r.revealedCards || []).forEach((c) => cardsEl.appendChild(renderCardFace(c)));
+      (r.revealedCards || []).forEach((c) => cardsEl.appendChild(c && c.suit ? renderCardFace(c) : renderCardBack()));
       const textEl = $('reveal-text');
       const accuserName = playerName(state, r.accuserId);
       const targetName = playerName(state, r.targetId);
+      const hiddenNoteEl = $('reveal-hidden-note');
+      if (r.accuserId === myId()) {
+        hide(hiddenNoteEl);
+      } else {
+        hiddenNoteEl.textContent = `🙈 Nur ${accuserName} hat die Karten aufgedeckt gesehen.`;
+        show(hiddenNoteEl);
+      }
       if (r.wasLie) {
         textEl.className = 'reveal-text lie';
         textEl.textContent = `❌ Gelogen! ${targetName} behauptete ${r.claimedCount}× ${rankLabel(r.claimedRank)}, hatte aber andere Karten. ${targetName} nimmt ${r.pileSize} Karte(n) auf – ${accuserName} hat den Bluff erkannt und eröffnet neu.`;
@@ -573,7 +603,8 @@
     list.innerHTML = '';
     orderedHand().forEach((card) => {
       const cardEl = renderCardFace(card);
-      cardEl.setAttribute('draggable', 'true');
+      cardEl.setAttribute('draggable', autoSortEnabled ? 'false' : 'true');
+      if (autoSortEnabled) cardEl.classList.add('auto-sorted');
       if (!myTurn) cardEl.classList.add('disabled');
       if (selectedCardIds.has(card.id)) cardEl.classList.add('selected');
       cardEl.addEventListener('click', () => {

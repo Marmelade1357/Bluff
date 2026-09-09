@@ -10,7 +10,7 @@ Basiert auf den hausinternen Regeln (siehe `Bluff.docx`): reihum wird verdeckt e
 - **Würfelwurf für die erste Runde** – wie am echten Tisch entscheidet ein virtueller Würfelwurf, wer die allererste Runde eröffnet. Danach eröffnet immer, wer die vorige Runde als letzte:r noch Karten auf der Hand hatte.
 - **Verdecktes Legen + "Bluff!"-Ruf** – Karten werden verdeckt abgelegt, nur Spieler:in und Anzahl sind für alle sichtbar. Wird "Bluff!" gerufen, deckt der Server nur den zuletzt gelegten Zug auf und wertet ihn sofort aus.
 - **Automatische 4er-Ablage** – hat jemand 4 Karten derselben Sorte auf der Hand (auch 4 Buben), werden diese automatisch abgelegt, direkt nach dem Austeilen oder nachdem der Stapel aufgenommen wurde.
-- **Einstellbares Deck** – der Host wählt in der Lobby zwischen 32 Karten (7 bis As) oder 52 Karten (2 bis As), optional 2 kombinierten Decks für große Runden, sowie die Anzahl der Buben (Joker) im Spiel.
+- **Einstellbares Deck** – der Host wählt in der Lobby zwischen 32 Karten (7 bis Ass) oder 52 Karten (2 bis Ass), optional 2 kombinierten Decks für große Runden, sowie die Anzahl der Buben (Joker) im Spiel.
 - **Test-Bots** – der Raum lässt sich in der Lobby per Klick mit Bots auffüllen. Sie schätzen anhand der eigenen Hand und der schon behaupteten Kartenzahl ab, ob ein Zug plausibel ist, bluffen gelegentlich selbst und rufen ab und zu (auch mal grundlos) "Bluff!".
 - Wiederverbindung nach Verbindungsabbruch/Neuladen der Seite (Sitzplatz und Hand bleiben erhalten).
 - Läuft komplett im Speicher – keine Datenbank nötig, ideal für einen Raspberry Pi.

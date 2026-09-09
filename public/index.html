@@ -67,8 +67,8 @@
       <div class="deck-settings-row">
         <label>Kartenwerte</label>
         <select id="setting-deck-range">
-          <option value="52">52 Karten (2 bis As)</option>
-          <option value="32">32 Karten (7 bis As)</option>
+          <option value="52">52 Karten (2 bis Ass)</option>
+          <option value="32">32 Karten (7 bis Ass)</option>
         </select>
       </div>
       <div class="deck-settings-row">
@@ -139,6 +139,7 @@
   <div id="reveal-overlay" class="modal hidden">
     <div class="modal-content reveal-modal-content">
       <div id="reveal-cards" class="reveal-cards"></div>
+      <p id="reveal-hidden-note" class="reveal-hidden-note hidden"></p>
       <p id="reveal-text" class="reveal-text"></p>
     </div>
   </div>
@@ -156,7 +157,14 @@
   </div>
 
   <div id="hand-bar" class="hand-bar hidden">
-    <div class="hand-bar-label" id="hand-bar-label">Deine Karten</div>
+    <div class="hand-bar-top">
+      <div class="hand-bar-label" id="hand-bar-label">Deine Karten</div>
+      <label class="auto-sort-toggle" title="Handkarten automatisch nach Rang sortieren">
+        <input type="checkbox" id="auto-sort-toggle" />
+        <span class="toggle-switch"></span>
+        <span class="toggle-label-text">Auto-Sortierung</span>
+      </label>
+    </div>
     <ul id="hand-list" class="hand-list"></ul>
   </div>
 </section>

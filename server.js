@@ -33,13 +33,13 @@ const SUIT_INFO = {
   karo: { symbol: '♦', color: 'red' },
 };
 
-// "32 Karten" = klassisches Skatblatt (7 bis As), "52 Karten" = voller Satz (2 bis As).
+// "32 Karten" = klassisches Skatblatt (7 bis Ass), "52 Karten" = voller Satz (2 bis Ass).
 // Das entspricht der Regel 1.4 ("Je nach Spielerzahl und eigenem Ermessen wird die
 // Anzahl an Karten ... im Deck gesetzt") - online per Lobby-Einstellung statt per
 // Hand voller aufgedeckter Kartenstapel.
 const RANKS_32 = ['7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
 const RANKS_52 = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
-const RANK_LABELS = { J: 'Bube', Q: 'Dame', K: 'König', A: 'As' };
+const RANK_LABELS = { J: 'Bube', Q: 'Dame', K: 'König', A: 'Ass' };
 
 function ranksFor(deckRange) {
   return deckRange === '32' ? RANKS_32 : RANKS_52;
@@ -302,7 +302,7 @@ function dealCards(players, deck) {
 // Öffentlicher Zustand
 // ---------------------------------------------------------------------------
 
-function publicState(room) {
+function publicState(room, viewerId) {
   const actor = currentActor(room);
   return {
     code: room.code,
@@ -325,10 +325,19 @@ function publicState(room) {
     currentTurnId: actor ? actor.id : null,
     isPileEmpty: room.pile.length === 0,
     finishedOrder: room.finishedOrder,
-    lastReveal: room.lastReveal,
+    lastReveal: maskRevealFor(room.lastReveal, viewerId),
     history: room.history,
     logs: room.logs.slice(-40),
   };
+}
+
+// Nur wer "Bluff!" gerufen hat, bekommt die tatsächlich aufgedeckten Karten zu
+// sehen. Alle anderen (inkl. der/dem Beschuldigten) sehen nur Kartenrücken in
+// der richtigen Anzahl - das Ergebnis (gelogen/Wahrheit) bleibt für alle sichtbar.
+function maskRevealFor(reveal, viewerId) {
+  if (!reveal) return null;
+  if (viewerId != null && viewerId === reveal.accuserId) return reveal;
+  return { ...reveal, revealedCards: reveal.revealedCards.map(() => ({ hidden: true })) };
 }
 
 function sendHandTo(room, player) {
@@ -338,7 +347,12 @@ function sendHandTo(room, player) {
 }
 
 function broadcastState(room) {
-  io.to(room.code).emit('gameState', publicState(room));
+  // Pro Spieler-Socket einzeln senden (nicht als ein gemeinsamer Raum-Broadcast),
+  // weil die Bluff-Aufdeckung für den Ankläger anders aussieht als für alle anderen.
+  room.players.forEach((p) => {
+    if (!p.socketId) return;
+    io.to(p.socketId).emit('gameState', publicState(room, p.id));
+  });
   room.players.forEach((p) => sendHandTo(room, p));
   scheduleBotTurnIfNeeded(room);
 }
