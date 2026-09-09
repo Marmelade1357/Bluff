@@ -362,10 +362,6 @@ function broadcastState(room) {
 // ---------------------------------------------------------------------------
 
 function startGame(room) {
-  // Zufällige Sitzreihenfolge für diese Partie, unabhängig von der Beitrittsreihenfolge.
-  // Das ist zugleich die Zugreihenfolge am (virtuellen) Tisch - siehe Regel:
-  // "Zufällige Reihenfolge, wenn man aus der Lobby in eine Runde geht".
-  room.players = shuffle(room.players);
   room.roundNumber = 0;
   room.history = [];
   room.logs = [];
@@ -382,6 +378,10 @@ function startGame(room) {
 }
 
 function startRound(room) {
+  // Zufällige Sitz-/Zugreihenfolge für diese Runde, unabhängig von der Beitritts-
+  // reihenfolge und unabhängig von der Sitzordnung der vorigen Runde - wird also
+  // vor jeder neuen Runde (auch der ersten) neu ausgelost.
+  room.players = shuffle(room.players);
   const deck = shuffle(buildDeck(room.settings));
   if (deck.length < room.players.length) {
     log(room, 'Zu wenige Karten im Deck für so viele Spieler - Deckgröße wurde nicht angepasst.');

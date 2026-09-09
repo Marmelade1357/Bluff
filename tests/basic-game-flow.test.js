@@ -47,8 +47,12 @@ async function main() {
     assert(playingState.starterPlayerId, 'Es sollte ein Startspieler (Würfelergebnis) feststehen');
     assert(playingState.diceRoll && playingState.diceRoll.starterId === playingState.starterPlayerId, 'Würfelergebnis sollte zum Startspieler passen');
 
+    // Direkt nach dem Austeilen greift bereits die automatische 4er-Ablage (Regel 2.8),
+    // falls jemand zufällig 4 gleiche Karten auf der Hand hat - dann sind es entsprechend
+    // weniger als deckSize, aber immer ein Vielfaches von 4 weniger.
     const totalHandsAtStart = playingState.players.reduce((sum, p) => sum + p.handCount, 0);
-    assert(totalHandsAtStart === playingState.deckSize, `Alle ${playingState.deckSize} Karten sollten verteilt sein, waren aber ${totalHandsAtStart}`);
+    const missing = playingState.deckSize - totalHandsAtStart;
+    assert(missing >= 0 && missing % 4 === 0, `Alle ${playingState.deckSize} Karten sollten verteilt sein (evtl. minus automatisch abgelegte 4er-Gruppen), waren aber ${totalHandsAtStart} (fehlend: ${missing})`);
 
     const roundEndState = await waitForState(host, (s) => s.phase === 'roundend', 60000);
     assert(roundEndState.finishedOrder.length === 4, `Am Rundenende sollten alle 4 Spieler in der Reihenfolge stehen, waren aber ${roundEndState.finishedOrder.length}`);
