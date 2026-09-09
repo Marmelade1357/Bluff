@@ -533,6 +533,7 @@ input:focus, select:focus { outline: 2px solid var(--gold); }
 .hand-list .pcard.auto-sorted.disabled { cursor: not-allowed; }
 .hand-list .pcard.selected { box-shadow: 0 0 0 3px var(--gold), 0 6px 16px rgba(0,0,0,0.5); }
 .hand-list .pcard.disabled { cursor: not-allowed; }
+.hand-list .pcard.limit-reached { cursor: not-allowed; filter: grayscale(0.35) brightness(0.85); }
 .hand-list .pcard.dragging {
   cursor: grabbing;
   opacity: 1;

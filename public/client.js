@@ -14,6 +14,7 @@
   }
 
   const SESSION_KEY = 'bluff_session';
+  const MAX_CARDS_PER_PLAY = 3; // Man darf pro Zug höchstens 3 Karten legen.
   const RANK_LABELS = { J: 'Bube', Q: 'Dame', K: 'König', A: 'Ass' };
   const SUIT_INFO = {
     pik: { symbol: '♠' },
@@ -561,7 +562,7 @@
     show(bar);
 
     if (state.isPileEmpty) {
-      content.appendChild(el('p', { class: 'action-bar-note', text: 'Wähle die Sorte, die du ansagst, und dann 1+ Karten aus deiner Hand.' }));
+      content.appendChild(el('p', { class: 'action-bar-note', text: `Wähle die Sorte, die du ansagst, und dann 1-${MAX_CARDS_PER_PLAY} Karten aus deiner Hand.` }));
       const rankRow = el('div', { class: 'rank-choice' });
       (state.claimableRanks || []).forEach((r) => {
         const b = el('button', { class: 'rank-btn' + (selectedRank === r ? ' selected' : ''), text: rankLabel(r) });
@@ -579,7 +580,7 @@
       });
       content.appendChild(el('div', { class: 'action-buttons' }, [playBtn]));
     } else {
-      content.appendChild(el('p', { class: 'action-bar-note', text: `Angesagte Sorte: ${rankLabel(state.requiredRank)}. Lege 1+ Karten nach oder rufe "Bluff!" auf den letzten Zug.` }));
+      content.appendChild(el('p', { class: 'action-bar-note', text: `Angesagte Sorte: ${rankLabel(state.requiredRank)}. Lege 1-${MAX_CARDS_PER_PLAY} Karten nach oder rufe "Bluff!" auf den letzten Zug.` }));
       const playBtn = el('button', { class: 'btn primary', text: `Nachlegen (${selectedCardIds.size})` });
       playBtn.disabled = selectedCardIds.size === 0;
       playBtn.addEventListener('click', () => {
@@ -606,12 +607,14 @@
       cardEl.setAttribute('draggable', autoSortEnabled ? 'false' : 'true');
       if (autoSortEnabled) cardEl.classList.add('auto-sorted');
       if (!myTurn) cardEl.classList.add('disabled');
-      if (selectedCardIds.has(card.id)) cardEl.classList.add('selected');
+      const isSelected = selectedCardIds.has(card.id);
+      if (isSelected) cardEl.classList.add('selected');
+      if (myTurn && !isSelected && selectedCardIds.size >= MAX_CARDS_PER_PLAY) cardEl.classList.add('limit-reached');
       cardEl.addEventListener('click', () => {
         if (dragMoved) { dragMoved = false; return; } // Klick am Ende eines Drags nicht als Auswahl werten
         if (!myTurn) return;
         if (selectedCardIds.has(card.id)) selectedCardIds.delete(card.id);
-        else selectedCardIds.add(card.id);
+        else if (selectedCardIds.size < MAX_CARDS_PER_PLAY) selectedCardIds.add(card.id);
         render(state);
       });
       list.appendChild(cardEl);

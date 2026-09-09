@@ -22,6 +22,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 const MIN_PLAYERS = 2;
 const MAX_PLAYERS = 8;
+const MAX_CARDS_PER_PLAY = 3; // Man darf pro Zug (Eröffnen oder Nachlegen) höchstens 3 Karten legen.
 const MAX_ROOMS = 500; // Sicherheitsventil gegen Speicher-Erschöpfung durch Missbrauch
 const ROOM_CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // ohne verwechselbare Zeichen
 
@@ -457,6 +458,7 @@ function handleStartPile(room, playerId, rank, cardIds) {
   const claimable = claimableRanksFor(room.settings.deckRange);
   if (!claimable.includes(rank)) return;
   if (!Array.isArray(cardIds) || cardIds.length === 0) return;
+  if (cardIds.length > MAX_CARDS_PER_PLAY) return; // höchstens 3 Karten pro Zug
   const hand = room.hands[playerId] || [];
   const cards = cardIds.map((id) => hand.find((c) => c.id === id)).filter(Boolean);
   if (cards.length !== cardIds.length) return; // eine Karte war nicht in der Hand
@@ -480,6 +482,7 @@ function handlePlayCards(room, playerId, cardIds) {
   const actor = currentActor(room);
   if (!actor || actor.id !== playerId) return;
   if (!Array.isArray(cardIds) || cardIds.length === 0) return;
+  if (cardIds.length > MAX_CARDS_PER_PLAY) return; // höchstens 3 Karten pro Zug
   const hand = room.hands[playerId] || [];
   const cards = cardIds.map((id) => hand.find((c) => c.id === id)).filter(Boolean);
   if (cards.length !== cardIds.length) return;
