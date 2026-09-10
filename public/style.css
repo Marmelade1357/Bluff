@@ -183,6 +183,9 @@ input:focus, select:focus { outline: 2px solid var(--gold); }
 .deck-settings-row select { width: auto; min-width: 190px; }
 .stepper { display: flex; align-items: center; gap: 10px; }
 .stepper span { min-width: 22px; text-align: center; font-weight: 700; font-size: 1.1rem; color: var(--gold-bright); }
+.checkbox-label { display: flex; align-items: center; gap: 6px; color: var(--text); font-size: 0.9rem; cursor: pointer; }
+.checkbox-label input { width: auto; }
+.afk-toggle-row { margin-top: 10px; }
 .deck-settings-readonly { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--border); }
 
 /* ---------------- Spiel: Kopfzeile ---------------- */

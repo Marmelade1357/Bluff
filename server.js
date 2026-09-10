@@ -56,7 +56,7 @@ function rankLabel(rank) {
   return RANK_LABELS[rank] || rank;
 }
 
-const DEFAULT_SETTINGS = { deckRange: '52', deckCount: 1, jackCount: 4 };
+const DEFAULT_SETTINGS = { deckRange: '52', deckCount: 1, jackCount: 4, afkTimeoutEnabled: true };
 
 function maxJackCount(deckCount) {
   return 4 * deckCount;
@@ -68,6 +68,7 @@ function clampSettings(settings) {
   s.deckCount = [1, 2].includes(Number(s.deckCount)) ? Number(s.deckCount) : 1;
   const maxJacks = maxJackCount(s.deckCount);
   s.jackCount = Math.max(0, Math.min(maxJacks, Number.isFinite(Number(s.jackCount)) ? Math.round(Number(s.jackCount)) : maxJacks));
+  s.afkTimeoutEnabled = s.afkTimeoutEnabled !== false;
   return s;
 }
 
@@ -585,6 +586,12 @@ function addBot(room) {
 const BOT_DELAY_MIN = Number(process.env.BOT_DELAY_MIN_MS) || 1000;
 const BOT_DELAY_MAX = Number(process.env.BOT_DELAY_MAX_MS) || 2600;
 
+// AFK-Timeout für verbundene, aber untätige Menschen (z. B. gesperrtes Handy) -
+// per Lobby-Einstellung abschaltbar (room.settings.afkTimeoutEnabled), über
+// eine Umgebungsvariable konfigurierbar, damit Tests nicht wirklich 60s warten
+// müssen.
+const AFK_TIMEOUT_MS = Number(process.env.AFK_TIMEOUT_MS) || 60000;
+
 function randomDelay(min = BOT_DELAY_MIN, max = BOT_DELAY_MAX) {
   return min + Math.random() * (max - min);
 }
@@ -661,12 +668,39 @@ function decideBotAction(room, bot) {
   return { type: 'play', cardIds: cards.map((c) => c.id) };
 }
 
+// Sicherer Auto-Zug für eine abwesende echte Person (Verbindung getrennt ODER
+// AFK-Timeout abgelaufen): legt Karten nach - bevorzugt ehrliche (echte Sorte
+// oder Buben), sonst irgendwelche. Ruft aber NIE automatisch "Bluff!", da das
+// eine Anschuldigung gegen eine andere echte Person im Namen der/des
+// Abwesenden wäre.
+function decideAfkPlay(room, actor) {
+  const hand = room.hands[actor.id] || [];
+  const counts = tally(hand);
+  const realCount = counts[room.requiredRank] || 0;
+  const jackCount = counts.J || 0;
+  const honestAvailable = realCount + jackCount;
+  const playCount = honestAvailable > 0
+    ? Math.max(1, Math.min(honestAvailable, hand.length, 1 + Math.floor(Math.random() * 2)))
+    : Math.max(1, Math.min(hand.length, 1));
+  const cards = pickCardsForClaim(hand, room.requiredRank, playCount);
+  return cards.map((c) => c.id);
+}
+
 function scheduleBotTurnIfNeeded(room) {
   if (room.phase !== 'playing') return;
   const actor = currentActor(room);
-  if (!actor || !actor.isBot) return;
+  if (!actor) return;
+  const isConnectedHuman = !actor.isBot && actor.connected;
+  const isDisconnectedHuman = !actor.isBot && !actor.connected;
+  if (!actor.isBot && !isDisconnectedHuman && !isConnectedHuman) return;
+  // Ein verbundener Mensch bekommt nur dann einen Auto-Zug-Timer, wenn der
+  // Host das AFK-Timeout nicht abgeschaltet hat - eine getrennte Person oder
+  // ein Bot darf dagegen nie dauerhaft blockieren, unabhängig davon.
+  if (isConnectedHuman && !room.settings.afkTimeoutEnabled) return;
+
   const turnIdxAtSchedule = room.currentTurnIndex;
   const pileLenAtSchedule = room.pile.length;
+  const delay = isConnectedHuman ? AFK_TIMEOUT_MS : randomDelay();
   setTimeout(() => {
     if (!rooms.has(room.code)) return;
     if (room.phase !== 'playing') return;
@@ -674,12 +708,17 @@ function scheduleBotTurnIfNeeded(room) {
     if (room.pile.length === 0) {
       const { rank, cardIds } = decideBotStart(room, actor);
       if (cardIds.length) handleStartPile(room, actor.id, rank, cardIds);
-    } else {
+      return;
+    }
+    if (actor.isBot) {
       const action = decideBotAction(room, actor);
       if (action.type === 'bluff') handleCallBluff(room, actor.id);
       else if (action.cardIds.length) handlePlayCards(room, actor.id, action.cardIds);
+    } else {
+      const cardIds = decideAfkPlay(room, actor);
+      if (cardIds.length) handlePlayCards(room, actor.id, cardIds);
     }
-  }, randomDelay());
+  }, delay);
 }
 
 // ---------------------------------------------------------------------------

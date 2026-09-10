@@ -87,6 +87,8 @@
         </div>
       </div>
       <p class="hint">Buben zählen als Joker – jede Sorte, außer sich selbst (Regel 2.9). Weniger Buben = weniger Rettungsanker beim Bluffen.</p>
+
+      <label class="checkbox-label afk-toggle-row"><input type="checkbox" id="setting-afk-timeout" checked> ⏱️ Nach 60s Inaktivität automatisch Karten nachlegen</label>
     </div>
     <div id="deck-settings-readonly" class="hint deck-settings-readonly hidden"></div>
 
@@ -105,6 +107,7 @@
         <span id="round-badge" class="round-badge"></span>
       </div>
       <div class="game-header-right">
+        <button id="btn-mute" class="btn ghost small" title="Ton stummschalten">🔊</button>
         <button id="btn-show-rules" class="btn ghost small">📜 Regeln</button>
         <button id="btn-show-history" class="btn ghost small">🏁 Verlauf</button>
         <button id="btn-leave-game" class="btn ghost small">Verlassen</button>

@@ -32,6 +32,88 @@
   let diceShownForRound = null;
 
   // ---------------------------------------------------------------------
+  // Sound & Vibration - kurzer Hinweis, sobald man selbst am Zug ist (Karte
+  // legen oder "Bluff!" rufen). Rein synthetisch per Web Audio API erzeugt
+  // (kein Audio-Asset nötig) und mit navigator.vibrate() kombiniert - beides
+  // rein additiv: fehlt die API oder wird sie blockiert (z.B. Autoplay-
+  // Policy vor der ersten Nutzerinteraktion), passiert einfach nichts.
+  // ---------------------------------------------------------------------
+
+  const MUTE_KEY = 'bluff_muted';
+  let soundMuted = false;
+  try { soundMuted = localStorage.getItem(MUTE_KEY) === '1'; } catch (e) { soundMuted = false; }
+
+  function updateMuteButton() {
+    const btn = $('btn-mute');
+    if (!btn) return;
+    btn.textContent = soundMuted ? '🔇' : '🔊';
+    btn.title = soundMuted ? 'Ton einschalten' : 'Ton stummschalten';
+  }
+
+  let audioCtx = null;
+  function getAudioCtx() {
+    if (audioCtx) return audioCtx;
+    try {
+      const Ctx = window.AudioContext || window.webkitAudioContext;
+      if (Ctx) audioCtx = new Ctx();
+    } catch (e) { audioCtx = null; }
+    return audioCtx;
+  }
+
+  function playTone(freq, duration, delay, volume) {
+    if (soundMuted) return;
+    const ctx = getAudioCtx();
+    if (!ctx) return;
+    if (ctx.state === 'suspended') ctx.resume().catch(() => {});
+    try {
+      const t0 = ctx.currentTime + (delay || 0);
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.frequency.value = freq;
+      osc.type = 'sine';
+      gain.gain.setValueAtTime(0, t0);
+      gain.gain.linearRampToValueAtTime(volume || 0.15, t0 + 0.01);
+      gain.gain.exponentialRampToValueAtTime(0.0001, t0 + duration);
+      osc.connect(gain).connect(ctx.destination);
+      osc.start(t0);
+      osc.stop(t0 + duration + 0.02);
+    } catch (e) { /* Sound ist rein kosmetisch - Fehler einfach ignorieren */ }
+  }
+
+  function playTurnAlert() { playTone(660, 0.1, 0, 0.14); playTone(880, 0.12, 0.1, 0.14); }
+
+  function vibrate(pattern) {
+    if (navigator.vibrate) {
+      try { navigator.vibrate(pattern); } catch (e) { /* Vibration ist optional */ }
+    }
+  }
+
+  // ---------------------------------------------------------------------
+  // Screen Wake Lock - verhindert, dass sich das Handy während des Spiels
+  // von selbst abschaltet/sperrt (z.B. während man auf seinen Zug wartet).
+  // Rein additiv: fehlt die API, wird die Anfrage abgelehnt (z.B. Tab im
+  // Hintergrund) oder ist der Akkusparmodus aktiv, passiert einfach nichts -
+  // die Spiellogik hängt nie davon ab.
+  // ---------------------------------------------------------------------
+
+  let wakeLock = null;
+  async function requestWakeLock() {
+    if (!('wakeLock' in navigator)) return;
+    try {
+      wakeLock = await navigator.wakeLock.request('screen');
+      wakeLock.addEventListener('release', () => { wakeLock = null; });
+    } catch (e) { /* z.B. Tab nicht sichtbar oder nicht unterstützt - ignorieren */ }
+  }
+  function releaseWakeLock() {
+    if (wakeLock) { wakeLock.release().catch(() => {}); wakeLock = null; }
+  }
+  document.addEventListener('visibilitychange', () => {
+    const homeScreen = document.getElementById('screen-home');
+    const onHomeScreen = homeScreen && !homeScreen.classList.contains('hidden');
+    if (document.visibilityState === 'visible' && !onHomeScreen) requestWakeLock();
+  });
+
+  // ---------------------------------------------------------------------
   // Helfer
   // ---------------------------------------------------------------------
 
@@ -41,6 +123,25 @@
   function showScreen(id) {
     document.querySelectorAll('.screen').forEach((s) => hide(s));
     show($(id));
+    if (id === 'screen-home') releaseWakeLock(); else requestWakeLock();
+  }
+
+  // Zwei-Klick-Bestätigung für eine Aktion, die man nicht aus Versehen
+  // auslösen sollte (z.B. das Spiel verlassen) - analog zum bestehenden
+  // Muster bei "Bot/Spieler entfernen": erster Klick versetzt den Button für
+  // ein paar Sekunden in einen "Sicher?"-Zustand, erst der zweite Klick
+  // innerhalb dieses Fensters führt die Aktion wirklich aus.
+  function attachConfirmClick(btn, onConfirm) {
+    if (!btn) return;
+    const originalText = btn.textContent;
+    let confirmTimer = null;
+    const reset = () => { clearTimeout(confirmTimer); confirmTimer = null; btn.classList.remove('danger'); btn.textContent = originalText; };
+    btn.addEventListener('click', () => {
+      if (confirmTimer) { reset(); onConfirm(); return; }
+      btn.classList.add('danger');
+      btn.textContent = 'Sicher?';
+      confirmTimer = setTimeout(reset, 3000);
+    });
   }
 
   let toastTimer = null;
@@ -137,19 +238,29 @@
     });
   });
 
-  $('btn-leave-lobby').addEventListener('click', () => {
+  attachConfirmClick($('btn-leave-lobby'), () => {
     socket.emit('leaveRoom');
     clearSession();
     latestState = null;
     showScreen('screen-home');
   });
 
-  $('btn-leave-game').addEventListener('click', () => {
+  attachConfirmClick($('btn-leave-game'), () => {
     socket.emit('leaveRoom');
     clearSession();
     latestState = null;
     showScreen('screen-home');
   });
+
+  const muteBtn = $('btn-mute');
+  if (muteBtn) {
+    muteBtn.addEventListener('click', () => {
+      soundMuted = !soundMuted;
+      try { localStorage.setItem(MUTE_KEY, soundMuted ? '1' : '0'); } catch (e) { /* localStorage optional */ }
+      updateMuteButton();
+    });
+    updateMuteButton();
+  }
 
   $('btn-add-bot').addEventListener('click', () => socket.emit('addBot'));
   $('btn-fill-bots').addEventListener('click', () => socket.emit('fillBots'));
@@ -168,6 +279,7 @@
     const next = Math.min(max, latestState.settings.jackCount + 1);
     socket.emit('updateSettings', { jackCount: next });
   });
+  $('setting-afk-timeout').addEventListener('change', (e) => socket.emit('updateSettings', { afkTimeoutEnabled: e.target.checked }));
 
   [['btn-show-rules-lobby', 'rules-modal'], ['btn-show-rules', 'rules-modal'], ['btn-show-history', 'history-modal']].forEach(([btnId, modalId]) => {
     $(btnId).addEventListener('click', () => {
@@ -245,8 +357,19 @@
     if (latestState) render(latestState);
   });
 
+  let notifiedTurnKey = null;
+  function maybeNotifyMyTurn(state) {
+    if (state.phase !== 'playing' || state.currentTurnId !== myId()) return;
+    const key = `${state.currentTurnId}|${state.isPileEmpty}|${state.pile ? state.pile.length : 0}`;
+    if (key === notifiedTurnKey) return;
+    notifiedTurnKey = key;
+    playTurnAlert();
+    vibrate(120);
+  }
+
   socket.on('gameState', (state) => {
     latestState = state;
+    maybeNotifyMyTurn(state);
     render(state);
   });
 
@@ -335,12 +458,14 @@
       $('setting-jack-value').textContent = state.settings.jackCount;
       $('setting-jack-minus').disabled = state.settings.jackCount <= 0;
       $('setting-jack-plus').disabled = state.settings.jackCount >= state.maxJackCount;
+      $('setting-afk-timeout').checked = state.settings.afkTimeoutEnabled !== false;
     } else {
       hide(deckSettings);
       show(deckReadonly);
       deckReadonly.textContent = `🂠 Deck: ${state.settings.deckRange} Karten` +
         (state.settings.deckCount > 1 ? ` × ${state.settings.deckCount} Decks` : '') +
-        `, ${state.settings.jackCount} Buben (${state.deckSize} Karten gesamt).`;
+        `, ${state.settings.jackCount} Buben (${state.deckSize} Karten gesamt).` +
+        (state.settings.afkTimeoutEnabled !== false ? ' ⏱️ Auto-Zug nach 60s Inaktivität aktiv.' : '');
     }
 
     const startBtn = $('btn-start');
