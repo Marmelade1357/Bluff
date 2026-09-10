@@ -811,6 +811,11 @@ io.on('connection', (socket) => {
       log(room, `${player.name} hat den Raum verlassen.`);
     } else {
       player.connected = false;
+      // socketId leeren: sonst würde broadcastState() dieser Person (deren
+      // Socket ja noch verbunden ist, nur den Raum verlassen hat) gleich
+      // noch einen letzten gameState-Broadcast schicken und den Client vom
+      // Startbildschirm zurück ins laufende Spiel reißen.
+      player.socketId = null;
       log(room, `${player.name} hat das Spiel verlassen.`);
     }
 
