@@ -1009,19 +1009,24 @@
       }
     } catch (e) { /* ignore */ }
 
-    // --- Einladungslink teilen ---
+    // --- Einladungslink kopieren ---
+    async function copyText(text) {
+      try { if (navigator.clipboard && window.isSecureContext) { await navigator.clipboard.writeText(text); return true; } } catch (e) { /* Fallback unten */ }
+      try {
+        const ta = document.createElement('textarea');
+        ta.value = text; ta.setAttribute('readonly', ''); ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0';
+        document.body.appendChild(ta); ta.select(); ta.setSelectionRange(0, text.length);
+        const ok = document.execCommand('copy'); document.body.removeChild(ta); return ok;
+      } catch (e) { return false; }
+    }
     const share = q('btn-share-link');
     if (share) {
       share.addEventListener('click', async () => {
         const code = (q('lobby-code').textContent || '').trim();
         if (!/^[A-Z0-9]{4}$/.test(code)) return;
         const url = window.location.origin + window.location.pathname + '?code=' + code;
-        const title = document.title.replace(/ – Online$/, '');
-        try {
-          if (navigator.share) { await navigator.share({ title, text: `Komm ins Spiel: ${title} – Raum ${code}`, url }); return; }
-        } catch (e) { if (e && e.name === 'AbortError') return; }
-        try { await navigator.clipboard.writeText(url); toast('Link kopiert – jetzt einfach verschicken.'); }
-        catch (e) { window.prompt('Link zum Kopieren:', url); }
+        if (await copyText(url)) toast('Link kopiert – jetzt einfach verschicken.');
+        else window.prompt('Link zum Kopieren:', url);
       });
     }
 
