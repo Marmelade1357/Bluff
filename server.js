@@ -56,7 +56,7 @@ function rankLabel(rank) {
   return RANK_LABELS[rank] || rank;
 }
 
-const DEFAULT_SETTINGS = { deckRange: '52', deckCount: 1, jackCount: 4, afkTimeoutEnabled: true };
+const DEFAULT_SETTINGS = { deckRange: '52', deckCount: 1, jackCount: 4 };
 
 function maxJackCount(deckCount) {
   return 4 * deckCount;
@@ -68,7 +68,6 @@ function clampSettings(settings) {
   s.deckCount = [1, 2].includes(Number(s.deckCount)) ? Number(s.deckCount) : 1;
   const maxJacks = maxJackCount(s.deckCount);
   s.jackCount = Math.max(0, Math.min(maxJacks, Number.isFinite(Number(s.jackCount)) ? Math.round(Number(s.jackCount)) : maxJacks));
-  s.afkTimeoutEnabled = s.afkTimeoutEnabled !== false;
   return s;
 }
 
@@ -330,6 +329,7 @@ function publicState(room, viewerId) {
     lastReveal: maskRevealFor(room.lastReveal, viewerId),
     history: room.history,
     logs: room.logs.slice(-40),
+    waiting: waitInfo(room),
   };
 }
 
@@ -586,11 +586,14 @@ function addBot(room) {
 const BOT_DELAY_MIN = Number(process.env.BOT_DELAY_MIN_MS) || 1000;
 const BOT_DELAY_MAX = Number(process.env.BOT_DELAY_MAX_MS) || 2600;
 
-// AFK-Timeout für verbundene, aber untätige Menschen (z. B. gesperrtes Handy) -
-// per Lobby-Einstellung abschaltbar (room.settings.afkTimeoutEnabled), über
-// eine Umgebungsvariable konfigurierbar, damit Tests nicht wirklich 60s warten
-// müssen.
-const AFK_TIMEOUT_MS = Number(process.env.AFK_TIMEOUT_MS) || 60000;
+// Kein automatischer Zug mehr für verbundene Personen: Wer nicht reagiert, wird
+// allen angezeigt ("wartet seit X s"), und der Host kann nach SKIP_MIN_WAIT_MS
+// gezielt "Überspringen" wählen. Nur getrennte Personen und Bots ziehen weiter
+// automatisch. Ohne Host-Übergabe würde ein abwesender Host das Überspringen
+// blockieren - daher geht die Host-Rolle nach HOST_HANDOVER_MS Abwesenheit
+// (bzw. sofort beim Verlassen) an die nächste verbundene Person.
+const SKIP_MIN_WAIT_MS = Number(process.env.SKIP_MIN_WAIT_MS) || 20000;
+const HOST_HANDOVER_MS = Number(process.env.HOST_HANDOVER_MS) || 20000;
 
 function randomDelay(min = BOT_DELAY_MIN, max = BOT_DELAY_MAX) {
   return min + Math.random() * (max - min);
@@ -668,8 +671,44 @@ function decideBotAction(room, bot) {
   return { type: 'play', cardIds: cards.map((c) => c.id) };
 }
 
+// Auf wen wartet das Spiel gerade (nur verbundene Menschen)? Der Schlüssel
+// ändert sich mit jedem Zug, damit die Wartezeit neu zu zählen beginnt.
+function waitingFor(room) {
+  if (room.phase !== 'playing') return null;
+  const actor = currentActor(room);
+  if (!actor || actor.isBot || !actor.connected) return null;
+  return { ids: [actor.id], key: `${room.roundNumber}|${room.currentTurnIndex}|${room.pile.length}` };
+}
+
+function waitInfo(room) {
+  const w = waitingFor(room);
+  if (!w) { room._wait = null; return null; }
+  if (!room._wait || room._wait.key !== w.key) room._wait = { key: w.key, since: Date.now() };
+  return { ids: w.ids, elapsedMs: Date.now() - room._wait.since };
+}
+
+// Gibt true zurück, wenn die Host-Rolle weitergereicht wurde (der Aufrufer
+// sendet danach den neuen Zustand).
+function ensureHost(room) {
+  const host = findPlayer(room, room.hostId);
+  if (host && !host.isBot && host.connected) return false;
+  const next = room.players.find((p) => !p.isBot && p.connected);
+  if (!next) return false;
+  room.hostId = next.id;
+  log(room, `${next.name} ist jetzt Host.`);
+  return true;
+}
+
+function scheduleHostHandover(room) {
+  if (room.hostTimer) clearTimeout(room.hostTimer);
+  room.hostTimer = setTimeout(() => {
+    room.hostTimer = null;
+    if (rooms.has(room.code) && ensureHost(room)) { touchRoom(room); broadcastState(room); }
+  }, HOST_HANDOVER_MS);
+}
+
 // Sicherer Auto-Zug für eine abwesende echte Person (Verbindung getrennt ODER
-// AFK-Timeout abgelaufen): legt Karten nach - bevorzugt ehrliche (echte Sorte
+// übersprungen): legt Karten nach - bevorzugt ehrliche (echte Sorte
 // oder Buben), sonst irgendwelche. Ruft aber NIE automatisch "Bluff!", da das
 // eine Anschuldigung gegen eine andere echte Person im Namen der/des
 // Abwesenden wäre.
@@ -693,14 +732,13 @@ function scheduleBotTurnIfNeeded(room) {
   const isConnectedHuman = !actor.isBot && actor.connected;
   const isDisconnectedHuman = !actor.isBot && !actor.connected;
   if (!actor.isBot && !isDisconnectedHuman && !isConnectedHuman) return;
-  // Ein verbundener Mensch bekommt nur dann einen Auto-Zug-Timer, wenn der
-  // Host das AFK-Timeout nicht abgeschaltet hat - eine getrennte Person oder
-  // ein Bot darf dagegen nie dauerhaft blockieren, unabhängig davon.
-  if (isConnectedHuman && !room.settings.afkTimeoutEnabled) return;
+  // Verbundene Menschen bekommen keinen Auto-Zug (siehe waitingFor/skipTurn);
+  // eine getrennte Person oder ein Bot darf dagegen nie dauerhaft blockieren.
+  if (isConnectedHuman) return;
 
   const turnIdxAtSchedule = room.currentTurnIndex;
   const pileLenAtSchedule = room.pile.length;
-  const delay = isConnectedHuman ? AFK_TIMEOUT_MS : randomDelay();
+  const delay = randomDelay();
   setTimeout(() => {
     if (!rooms.has(room.code)) return;
     if (room.phase !== 'playing') return;
@@ -715,10 +753,21 @@ function scheduleBotTurnIfNeeded(room) {
       if (action.type === 'bluff') handleCallBluff(room, actor.id);
       else if (action.cardIds.length) handlePlayCards(room, actor.id, action.cardIds);
     } else {
-      const cardIds = decideAfkPlay(room, actor);
-      if (cardIds.length) handlePlayCards(room, actor.id, cardIds);
+      autoActFor(room, actor);
     }
   }, delay);
+}
+
+// Zug für eine abwesende/übersprungene echte Person (siehe skipTurn).
+function autoActFor(room, actor) {
+  if (room.phase !== 'playing') return;
+  if (room.pile.length === 0) {
+    const { rank, cardIds } = decideBotStart(room, actor);
+    if (cardIds.length) handleStartPile(room, actor.id, rank, cardIds);
+    return;
+  }
+  const cardIds = decideAfkPlay(room, actor);
+  if (cardIds.length) handlePlayCards(room, actor.id, cardIds);
 }
 
 // ---------------------------------------------------------------------------
@@ -764,6 +813,7 @@ io.on('connection', (socket) => {
       if (existing) {
         existing.socketId = socket.id;
         existing.connected = true;
+        if (room.hostTimer && room.hostId === existing.id) { clearTimeout(room.hostTimer); room.hostTimer = null; }
         socket.join(room.code);
         socket.data.roomCode = room.code;
         socket.data.playerId = existing.id;
@@ -805,10 +855,8 @@ io.on('connection', (socket) => {
 
     if (room.phase === 'lobby') {
       room.players = room.players.filter((p) => p.id !== player.id);
-      if (room.hostId === player.id) {
-        room.hostId = room.players.length ? room.players[0].id : null;
-      }
       log(room, `${player.name} hat den Raum verlassen.`);
+      ensureHost(room);
     } else {
       player.connected = false;
       // socketId leeren: sonst würde broadcastState() dieser Person (deren
@@ -817,6 +865,7 @@ io.on('connection', (socket) => {
       // Startbildschirm zurück ins laufende Spiel reißen.
       player.socketId = null;
       log(room, `${player.name} hat das Spiel verlassen.`);
+      ensureHost(room);
     }
 
     socket.leave(room.code);
@@ -888,6 +937,19 @@ io.on('connection', (socket) => {
     broadcastState(room);
   });
 
+  // Host (oder, falls der Host selbst trödelt, jede andere Person) lässt für
+  // eine Person, auf die schon länger gewartet wird, automatisch ziehen.
+  socket.on('skipTurn', () => {
+    const room = rooms.get(socket.data.roomCode);
+    if (!room) return;
+    const info = waitInfo(room);
+    if (!info || info.elapsedMs < SKIP_MIN_WAIT_MS) return;
+    const isHost = socket.data.playerId === room.hostId;
+    if (!isHost && !info.ids.includes(room.hostId)) return;
+    if (info.ids.includes(socket.data.playerId)) return;
+    info.ids.forEach((id) => { const p = findPlayer(room, id); if (p) autoActFor(room, p); });
+  });
+
   socket.on('startPile', ({ rank, cardIds }) => {
     const room = rooms.get(socket.data.roomCode);
     if (!room) return;
@@ -942,6 +1004,7 @@ io.on('connection', (socket) => {
     if (!player) return;
     player.connected = false;
     log(room, `${player.name} hat die Verbindung verloren.`);
+    if (room.hostId === player.id) scheduleHostHandover(room);
     touchRoom(room);
     broadcastState(room);
   });

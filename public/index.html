@@ -5,6 +5,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <title>Bluff (Lügen) – Online</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%83%8F%3C/text%3E%3C/svg%3E" />
+<meta name="theme-color" content="#0e1410" />
+<link rel="manifest" href="manifest.webmanifest" />
+<link rel="apple-touch-icon" href="apple-touch-icon.png" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-title" content="Bluff" />
 <link rel="stylesheet" href="style.css" />
 </head>
 <body>
@@ -49,6 +55,7 @@
       <div>
         <div class="eyebrow">Raum-Code – an Freunde weitergeben</div>
         <div id="lobby-code" class="room-code">----</div>
+        <button id="btn-share-link" class="btn secondary small" type="button">🔗 Einladungslink teilen</button>
       </div>
       <button id="btn-leave-lobby" class="btn ghost small">Verlassen</button>
     </div>
@@ -88,7 +95,6 @@
       </div>
       <p class="hint">Buben zählen als Joker – jede Sorte, außer sich selbst (Regel 2.9). Weniger Buben = weniger Rettungsanker beim Bluffen.</p>
 
-      <label class="checkbox-label afk-toggle-row"><input type="checkbox" id="setting-afk-timeout" checked> ⏱️ Nach 60s Inaktivität automatisch Karten nachlegen</label>
     </div>
     <div id="deck-settings-readonly" class="hint deck-settings-readonly hidden"></div>
 
@@ -133,7 +139,6 @@
       <div id="pile-center" class="pile-center">
         <div id="pile-stack" class="pile-stack"></div>
         <div id="pile-count" class="pile-count hidden">0</div>
-        <div id="pile-claim" class="pile-claim"></div>
       </div>
       <div id="seats-layer" class="seats-layer"></div>
     </div>
@@ -156,6 +161,7 @@
   </div>
 
   <div id="action-bar" class="action-bar hidden">
+    <div id="claim-line" class="claim-line" aria-live="polite"></div>
     <div id="action-bar-content"></div>
   </div>
 

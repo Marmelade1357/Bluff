@@ -315,6 +315,19 @@ input:focus, select:focus { outline: 2px solid var(--gold); }
   justify-content: center;
   border: 2px solid var(--gold);
 }
+.claim-line {
+  background: rgba(0,0,0,0.72);
+  border: 1px solid var(--gold);
+  color: var(--text);
+  padding: 6px 14px;
+  border-radius: 999px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  text-align: center;
+  max-width: 92vw;
+  box-shadow: 0 4px 14px rgba(0,0,0,0.4);
+}
+.claim-line:empty { display: none; }
 .pile-claim {
   margin-top: 8px;
   background: rgba(0,0,0,0.55);
@@ -417,7 +430,9 @@ input:focus, select:focus { outline: 2px solid var(--gold); }
   left: 0; right: 0;
   bottom: var(--hand-bar-height);
   display: flex;
-  justify-content: center;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
   z-index: 40;
   padding: 0 14px;
 }
@@ -612,7 +627,11 @@ input:focus, select:focus { outline: 2px solid var(--gold); }
 
 @media (max-width: 640px) {
   :root { --hand-bar-height: 208px; }
-  .table-oval { width: 94vw; height: min(76vw, var(--table-max-h)); border-width: 6px; }
+  .table-wrap { align-items: flex-start; min-height: 0; padding: 8px 8px calc(var(--hand-bar-height) + 8px); }
+  .table-oval { width: 96vw; height: clamp(300px, calc(100vh - 150px - var(--hand-bar-height) - 60px), 118vw); border-width: 6px; }
+  /* Am Zug erscheint die Aktionsleiste über der Handleiste - Tisch schrumpft entsprechend. */
+  body.turn-bar-open .table-oval { height: clamp(280px, calc(100vh - 150px - var(--hand-bar-height) - 60px - 128px), 118vw); }
+  .table-wrap { padding-bottom: calc(var(--hand-bar-height) + 8px); }
   .seat { width: 88px; }
   .seat-avatar { width: 42px; height: 42px; font-size: 1.05rem; }
   .seat-name { font-size: 0.72rem; max-width: 88px; }
@@ -633,3 +652,8 @@ input:focus, select:focus { outline: 2px solid var(--gold); }
   .player-panel-list { flex-direction: row; overflow-x: auto; padding-bottom: 2px; }
   .player-panel-row { flex-shrink: 0; }
 }
+
+/* --- Warte-Hinweis (Host kann überspringen) --- */
+.wait-banner{display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap;margin:6px auto;padding:8px 12px;max-width:640px;border-radius:10px;background:rgba(255,190,60,.16);border:1px solid rgba(255,190,60,.5);color:inherit;font-size:.92rem;text-align:center}
+.wait-banner.hidden{display:none}
+#btn-share-link{margin-top:6px}

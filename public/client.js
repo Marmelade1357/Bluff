@@ -279,7 +279,6 @@
     const next = Math.min(max, latestState.settings.jackCount + 1);
     socket.emit('updateSettings', { jackCount: next });
   });
-  $('setting-afk-timeout').addEventListener('change', (e) => socket.emit('updateSettings', { afkTimeoutEnabled: e.target.checked }));
 
   [['btn-show-rules-lobby', 'rules-modal'], ['btn-show-rules', 'rules-modal'], ['btn-show-history', 'history-modal']].forEach(([btnId, modalId]) => {
     $(btnId).addEventListener('click', () => {
@@ -458,14 +457,12 @@
       $('setting-jack-value').textContent = state.settings.jackCount;
       $('setting-jack-minus').disabled = state.settings.jackCount <= 0;
       $('setting-jack-plus').disabled = state.settings.jackCount >= state.maxJackCount;
-      $('setting-afk-timeout').checked = state.settings.afkTimeoutEnabled !== false;
     } else {
       hide(deckSettings);
       show(deckReadonly);
       deckReadonly.textContent = `🂠 Deck: ${state.settings.deckRange} Karten` +
         (state.settings.deckCount > 1 ? ` × ${state.settings.deckCount} Decks` : '') +
-        `, ${state.settings.jackCount} Buben (${state.deckSize} Karten gesamt).` +
-        (state.settings.afkTimeoutEnabled !== false ? ' ⏱️ Auto-Zug nach 60s Inaktivität aktiv.' : '');
+        `, ${state.settings.jackCount} Buben (${state.deckSize} Karten gesamt).`;
     }
 
     const startBtn = $('btn-start');
@@ -599,7 +596,7 @@
   function renderPile(state) {
     const stack = $('pile-stack');
     const countEl = $('pile-count');
-    const claimEl = $('pile-claim');
+    const claimEl = $('claim-line');
     stack.innerHTML = '';
 
     if (state.pileTotalCount > 0) {
@@ -683,8 +680,14 @@
     content.innerHTML = '';
 
     const myTurn = state.phase === 'playing' && state.currentTurnId === myId();
-    if (!myTurn) { hide(bar); return; }
+    // Die Ansage ("X behauptet: 2× Fünfen") steht als feste Zeile über der
+    // Handleiste - auch wenn man nicht am Zug ist.
+    const hasClaim = state.phase === 'playing' && !!$('claim-line').textContent;
+    if (!myTurn && !hasClaim) { hide(bar); document.body.classList.remove('turn-bar-open'); return; }
     show(bar);
+    content.classList.toggle('hidden', !myTurn);
+    document.body.classList.toggle('turn-bar-open', myTurn);
+    if (!myTurn) return;
 
     if (state.isPileEmpty) {
       content.appendChild(el('p', { class: 'action-bar-note', text: `Wähle die Sorte, die du ansagst, und dann 1-${MAX_CARDS_PER_PLAY} Karten aus deiner Hand.` }));
@@ -950,4 +953,134 @@
       content.appendChild(wrap);
     });
   }
+
+  // ---------------------------------------------------------------------
+  // Komfort: gemerkter Name, Enter-Taste, Einladungslink, Warte-Hinweis,
+  // Barrierefreiheits-Attribute
+  // ---------------------------------------------------------------------
+  (function comfort() {
+    const NAME_KEY = 'spiele_name';
+    const SKIP_AFTER_MS = 20000;
+    const q = (id) => document.getElementById(id);
+    const lsGet = (k) => { try { return localStorage.getItem(k); } catch (e) { return null; } };
+    const lsSet = (k, v) => { try { localStorage.setItem(k, v); } catch (e) { /* optional */ } };
+
+    // --- Name merken ---
+    const cn = q('create-name'); const jn = q('join-name'); const jc = q('join-code');
+    const cached = lsGet(NAME_KEY);
+    [cn, jn].forEach((inp) => {
+      if (!inp) return;
+      if (cached && !inp.value) inp.value = cached;
+      inp.addEventListener('input', () => { const v = inp.value.trim(); if (v) { lsSet(NAME_KEY, v); [cn, jn].forEach((o) => { if (o && o !== inp) o.value = inp.value; }); } });
+      inp.setAttribute('autocomplete', 'nickname');
+      inp.setAttribute('autocapitalize', 'words');
+      inp.setAttribute('aria-label', 'Dein Name');
+      inp.setAttribute('enterkeyhint', 'go');
+    });
+    if (jc) {
+      jc.setAttribute('autocomplete', 'off'); jc.setAttribute('autocapitalize', 'characters');
+      jc.setAttribute('autocorrect', 'off'); jc.setAttribute('spellcheck', 'false');
+      jc.setAttribute('aria-label', 'Raum-Code'); jc.setAttribute('enterkeyhint', 'go');
+      jc.addEventListener('input', () => { jc.value = jc.value.toUpperCase().replace(/[^A-Z0-9]/g, ''); });
+    }
+
+    // --- Enter sendet ab ---
+    if (cn) cn.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); q('btn-create').click(); } });
+    if (jn) jn.addEventListener('keydown', (e) => {
+      if (e.key !== 'Enter') return;
+      e.preventDefault();
+      if (jc && !jc.value.trim()) jc.focus(); else q('btn-join').click();
+    });
+    if (jc) jc.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); q('btn-join').click(); } });
+
+    // --- Beitritt per Link (?code=AB12) ---
+    try {
+      const urlCode = (new URLSearchParams(window.location.search).get('code') || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 4);
+      if (urlCode && jc) {
+        try {
+          const s = JSON.parse(localStorage.getItem(SESSION_KEY) || 'null');
+          if (s && s.code !== urlCode) localStorage.removeItem(SESSION_KEY);
+        } catch (e) { /* ignore */ }
+        jc.value = urlCode;
+        const tabBtn = document.querySelector('.tab-btn[data-tab="join"]');
+        if (tabBtn) tabBtn.click();
+        const target = (jn && !jn.value.trim()) ? jn : q('btn-join');
+        if (target) setTimeout(() => target.focus(), 50);
+      }
+    } catch (e) { /* ignore */ }
+
+    // --- Einladungslink teilen ---
+    const share = q('btn-share-link');
+    if (share) {
+      share.addEventListener('click', async () => {
+        const code = (q('lobby-code').textContent || '').trim();
+        if (!/^[A-Z0-9]{4}$/.test(code)) return;
+        const url = window.location.origin + window.location.pathname + '?code=' + code;
+        const title = document.title.replace(/ – Online$/, '');
+        try {
+          if (navigator.share) { await navigator.share({ title, text: `Komm ins Spiel: ${title} – Raum ${code}`, url }); return; }
+        } catch (e) { if (e && e.name === 'AbortError') return; }
+        try { await navigator.clipboard.writeText(url); toast('Link kopiert – jetzt einfach verschicken.'); }
+        catch (e) { window.prompt('Link zum Kopieren:', url); }
+      });
+    }
+
+    // --- Warte-Hinweis + "Überspringen" ---
+    const gameScreen = q('screen-game');
+    let banner = null; let bText = null; let bBtn = null;
+    let waiting = null; let recvAt = 0; let lastState = null;
+    if (gameScreen) {
+      banner = document.createElement('div');
+      banner.id = 'wait-banner'; banner.className = 'wait-banner hidden';
+      banner.setAttribute('role', 'status'); banner.setAttribute('aria-live', 'polite');
+      bText = document.createElement('span'); bText.id = 'wait-text';
+      bBtn = document.createElement('button'); bBtn.id = 'btn-skip-turn'; bBtn.type = 'button';
+      bBtn.className = 'btn secondary small hidden'; bBtn.textContent = '⏭ Überspringen';
+      bBtn.addEventListener('click', () => { socket.emit('skipTurn'); bBtn.classList.add('hidden'); });
+      banner.appendChild(bText); banner.appendChild(bBtn);
+      const header = gameScreen.querySelector('header');
+      if (header) header.after(banner); else gameScreen.prepend(banner);
+    }
+    function paintWait() {
+      if (!banner) return;
+      if (!waiting || !lastState || !waiting.ids.length || waiting.ids.includes(myId())) { banner.classList.add('hidden'); return; }
+      const sec = Math.floor((waiting.elapsedMs + (Date.now() - recvAt)) / 1000);
+      if (sec < 8) { banner.classList.add('hidden'); return; }
+      const names = waiting.ids.map((id) => { const p = (lastState.players || []).find((pl) => pl.id === id); return p ? p.name : '?'; }).join(', ');
+      bText.textContent = `⏳ ${names} – wartet seit ${sec} s`;
+      banner.classList.remove('hidden');
+      const canSkip = sec * 1000 >= SKIP_AFTER_MS && (lastState.hostId === myId() || waiting.ids.includes(lastState.hostId));
+      bBtn.classList.toggle('hidden', !canSkip);
+    }
+    socket.on('gameState', (state) => {
+      lastState = state;
+      const w = state.waiting || null;
+      if (w) { waiting = w; recvAt = Date.now(); } else { waiting = null; }
+      paintWait();
+    });
+    setInterval(paintWait, 1000);
+
+    // --- Barrierefreiheit ---
+    const toastEl = q('toast');
+    if (toastEl) { toastEl.setAttribute('role', 'status'); toastEl.setAttribute('aria-live', 'polite'); }
+    document.querySelectorAll('.modal').forEach((m) => {
+      m.setAttribute('role', 'dialog'); m.setAttribute('aria-modal', 'true');
+      const h = m.querySelector('h2'); if (h) m.setAttribute('aria-label', h.textContent.trim());
+    });
+    document.querySelectorAll('.modal-close').forEach((b) => b.setAttribute('aria-label', 'Schließen'));
+    const tabs = document.querySelector('.tabs');
+    if (tabs) {
+      tabs.setAttribute('role', 'tablist');
+      const syncTabs = () => tabs.querySelectorAll('.tab-btn').forEach((b) => b.setAttribute('aria-selected', b.classList.contains('active') ? 'true' : 'false'));
+      tabs.querySelectorAll('.tab-btn').forEach((b) => b.setAttribute('role', 'tab'));
+      document.querySelectorAll('.tab-panel').forEach((p) => p.setAttribute('role', 'tabpanel'));
+      new MutationObserver(syncTabs).observe(tabs, { subtree: true, attributes: true, attributeFilter: ['class'] });
+      syncTabs();
+    }
+    const labelIf = (id, txt) => { const e = q(id); if (e && !e.getAttribute('aria-label')) e.setAttribute('aria-label', txt); };
+    labelIf('btn-toggle-sound', 'Ton an oder aus'); labelIf('btn-sound', 'Ton an oder aus'); labelIf('btn-mute', 'Ton an oder aus');
+    labelIf('btn-leave-lobby', 'Raum verlassen'); labelIf('btn-leave-game', 'Spiel verlassen');
+    const lc = q('lobby-code'); if (lc) lc.setAttribute('aria-label', 'Raum-Code');
+  })();
+
 })();
